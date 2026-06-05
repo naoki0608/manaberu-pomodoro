@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>まなべるポモドーロ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(160deg, #E0F4FA 0%, #C5E8F5 55%, #B8E0EC 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'BIZ UDPGothic', sans-serif;
+      padding: 20px;
+    }
+
+    /* ── Background layer ── */
+    .stars-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .star { position: absolute; opacity: 0.72; }
+
+    /* ── Scene wrapper (holds card + side tomato slices) ── */
+    .scene {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 560px;
+    }
+
+/* ── Main card ── */
+    .card {
+      background: #ffffff;
+      border-radius: 32px;
+      padding: 20px 32px 28px;
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(255,111,0,.15), 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    /* ── Ribbon banner ── */
+    .ribbon-banner {
+      display: block;
+      width: calc(100% + 64px);
+      margin: 0 0 20px -32px;
+      padding: 13px 52px;
+      background: linear-gradient(135deg, #e85a3f, #f47551);
+      color: #fff;
+      font-size: clamp(.9rem, 3.5vw, 1.2rem);
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-shadow: 0 1px 3px rgba(0,0,0,.22);
+      clip-path: polygon(20px 0%, calc(100% - 20px) 0%, 100% 50%, calc(100% - 20px) 100%, 20px 100%, 0% 50%);
+      filter: drop-shadow(0 3px 6px rgba(232,90,63,.35));
+    }
+
+    /* ── Tomato character ── */
+    .tomato-wrap { margin: 4px 0 12px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+    #tomato-character {
+      width: clamp(100px, 32vw, 170px);
+      height: auto;
+      display: block;
+    }
+    .tomato-emoji-fallback {
+      font-size: clamp(4rem, 18vw, 7rem);
+      line-height: 1;
+    }
+
+    /* ── Inner timer card ── */
+    .inner-card {
+      position: relative;
+      background: #fffdf8;
+      border-radius: 22px;
+      padding: 32px 20px 20px;
+      margin: 26px 0 18px;
+      border: 1.5px solid rgba(255,180,80,.25);
+      box-shadow: 0 2px 12px rgba(255,111,0,.09);
+    }
+    .mode-badge {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff6d00;
+      color: #fff;
+      font-size: clamp(.72rem, 2.4vw, .88rem);
+      font-weight: 700;
+      letter-spacing: .08em;
+      padding: 7px 26px;
+      border-radius: 999px;
+      white-space: nowrap;
+      box-shadow: 0 3px 8px rgba(255,109,0,.4);
+    }
+    .timer-display {
+      font-size: clamp(3.5rem, 18vw, 7rem);
+      font-weight: 900;
+      color: #e85a3f;
+      letter-spacing: .04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 3px 10px rgba(232,90,63,.22);
+    }
+    .timer-divider {
+      width: 72%;
+      margin: 14px auto 12px;
+      border: none;
+      border-top: 2px dashed #ffcc80;
+    }
+    .timer-sub {
+      font-size: clamp(.72rem, 2.6vw, .92rem);
+      color: #bf6e3a;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+
+    body.break-mode {
+      background: linear-gradient(135deg, #eef8df 0%, #d8efc1 50%, #c4e6d1 100%);
+    }
+    body.break-mode .mode-badge {
+      background: #66a83f;
+      box-shadow: 0 3px 8px rgba(102,168,63,.38);
+    }
+    body.break-mode .timer-display {
+      color: #5fa33b;
+      text-shadow: 0 3px 10px rgba(95,163,59,.22);
+    }
+    body.break-mode .timer-divider {
+      border-top-color: #a9d88b;
+    }
+    body.break-mode .timer-sub {
+      color: #5f8f3b;
+    }
+
+    /* ── 3 action buttons ── */
+    .buttons {
+      display: flex;
+      gap: clamp(8px, 2vw, 14px);
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    .btn {
+      flex: 1;
+      max-width: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 13px 6px 9px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: clamp(.62rem, 2.1vw, .78rem);
+      color: #fff;
+      transition: transform .08s ease, box-shadow .08s ease;
+    }
+    .btn-icon  { font-size: clamp(1.2rem, 4.5vw, 1.55rem); line-height: 1; }
+    .btn-label { line-height: 1; }
+
+    .btn-start { background: linear-gradient(180deg,#f47551,#e85a3f); box-shadow: 0 5px 0 #9c3025, 0 7px 10px rgba(156,48,37,.28); }
+    .btn-pause { background: linear-gradient(180deg,#f9c850,#f4b43a); box-shadow: 0 5px 0 #a8761a, 0 7px 10px rgba(168,118,26,.28); }
+    .btn-reset { background: linear-gradient(180deg,#8dc44b,#7cb342); box-shadow: 0 5px 0 #4e7a1e, 0 7px 10px rgba(78,122,30,.28); }
+
+    .btn-start:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #9c3025, 0 9px 14px rgba(156,48,37,.3); }
+    .btn-pause:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #a8761a, 0 9px 14px rgba(168,118,26,.3); }
+    .btn-reset:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #4e7a1e, 0 9px 14px rgba(78,122,30,.3); }
+
+    .btn-start:active { transform: translateY(4px); box-shadow: 0 1px 0 #9c3025, 0 2px 3px rgba(156,48,37,.2); }
+    .btn-pause:active { transform: translateY(4px); box-shadow: 0 1px 0 #a8761a, 0 2px 3px rgba(168,118,26,.2); }
+    .btn-reset:active { transform: translateY(4px); box-shadow: 0 1px 0 #4e7a1e, 0 2px 3px rgba(78,122,30,.2); }
+
+    /* ── Green speech balloon ── */
+    .balloon {
+      display: inline-block;
+      position: relative;
+      background: #88C66B;
+      border: 2.5px solid #5a9f3a;
+      border-radius: 20px;
+      padding: 10px 24px;
+      font-size: clamp(.78rem, 2.8vw, .93rem);
+      font-weight: 700;
+      color: #fff;
+      margin-top: 14px;
+    }
+    .balloon::before {
+      content: '';
+      position: absolute;
+      top: -12px; left: 50%;
+      transform: translateX(-50%);
+      border: 8px solid transparent;
+      border-bottom-color: #5a9f3a;
+      border-top: none;
+    }
+    .balloon::after {
+      content: '';
+      position: absolute;
+      top: -8px; left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-bottom-color: #88C66B;
+      border-top: none;
+    }
+
+    .card-stars {
+      margin-top: 18px;
+      font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+      letter-spacing: .2em;
+    }
+
+    /* ── Progress strip (below card) ── */
+    .progress-strip {
+      background: #fdf5e8;
+      border-radius: 50px;
+      padding: 11px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .progress-label {
+      font-size: clamp(.68rem, 2.1vw, .8rem);
+      color: #a0522d;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .stars-track {
+      flex: 1;
+      font-size: clamp(1rem, 3.5vw, 1.3rem);
+      color: #e0a000;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+    .sets-badge {
+      background: #ff6d00;
+      color: #fff;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: clamp(.62rem, 1.9vw, .76rem);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 400px) {
+      .card { padding: 20px 20px 24px; }
+      .ribbon-banner { width: calc(100% + 40px); margin-left: -20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stars-bg" aria-hidden="true">
+    <!-- 学校・文房具アイテム + 星すこし -->
+    <span class="star" style="top:5%;left:8%;font-size:28px;transform:rotate(-20deg)">✏️</span>
+    <span class="star" style="top:10%;left:85%;font-size:32px;transform:rotate(15deg)">📚</span>
+    <span class="star" style="top:18%;left:14%;font-size:26px;transform:rotate(10deg)">🍎</span>
+    <span class="star" style="top:14%;left:68%;font-size:30px;transform:rotate(-10deg)">📓</span>
+    <span class="star" style="top:7%;left:42%;font-size:22px">⭐</span>
+    <span class="star" style="top:27%;left:4%;font-size:34px;transform:rotate(-15deg)">🎒</span>
+    <span class="star" style="top:32%;left:93%;font-size:26px;transform:rotate(30deg)">📐</span>
+    <span class="star" style="top:40%;left:9%;font-size:24px;transform:rotate(-30deg)">✂️</span>
+    <span class="star" style="top:44%;left:89%;font-size:28px;transform:rotate(5deg)">⚽</span>
+    <span class="star" style="top:54%;left:5%;font-size:30px;transform:rotate(-5deg)">🏀</span>
+    <span class="star" style="top:60%;left:91%;font-size:24px;transform:rotate(20deg)">✏️</span>
+    <span class="star" style="top:65%;left:11%;font-size:28px;transform:rotate(15deg)">📓</span>
+    <span class="star" style="top:70%;left:87%;font-size:26px;transform:rotate(-10deg)">🍎</span>
+    <span class="star" style="top:74%;left:48%;font-size:20px;transform:rotate(8deg)">⭐</span>
+    <span class="star" style="top:78%;left:7%;font-size:30px;transform:rotate(-20deg)">📚</span>
+    <span class="star" style="top:82%;left:89%;font-size:32px;transform:rotate(10deg)">🎒</span>
+    <span class="star" style="top:88%;left:22%;font-size:24px;transform:rotate(-25deg)">📐</span>
+    <span class="star" style="top:91%;left:72%;font-size:26px;transform:rotate(35deg)">✂️</span>
+    <span class="star" style="top:95%;left:42%;font-size:28px;transform:rotate(-5deg)">⚽</span>
+    <span class="star" style="top:22%;left:90%;font-size:26px;transform:rotate(-15deg)">✏️</span>
+    <span class="star" style="top:36%;left:2%;font-size:28px;transform:rotate(8deg)">🏀</span>
+    <span class="star" style="top:48%;left:94%;font-size:30px;transform:rotate(20deg)">📓</span>
+    <span class="star" style="top:58%;left:3%;font-size:24px;transform:rotate(-8deg)">🍎</span>
+    <span class="star" style="top:24%;left:28%;font-size:20px;transform:rotate(12deg)">⭐</span>
+    <span class="star" style="top:86%;left:55%;font-size:26px;transform:rotate(25deg)">✏️</span>
+    <span class="star" style="top:12%;left:32%;font-size:28px;transform:rotate(-12deg)">🎒</span>
+    <span class="star" style="top:93%;left:8%;font-size:22px;transform:rotate(5deg)">⭐</span>
+    <span class="star" style="top:3%;left:72%;font-size:24px;transform:rotate(-18deg)">📚</span>
+  </div>
+
+  <div class="scene">
+<div class="card">
+      <div class="ribbon-banner">今日の集中チャレンジ！</div>
+
+      <div class="tomato-wrap">
+        <!-- ※ tomato.png という名前の画像を index.html と同じフォルダに置くと、表示が画像に切り替わります -->
+        <img src="mascot.svg" alt="トマト" id="tomato-character">
+      </div>
+
+      <div class="inner-card">
+        <div class="mode-badge" id="mode-badge">集中タイム</div>
+        <div class="timer-display" id="timer">25:00</div>
+        <hr class="timer-divider">
+        <div class="timer-sub" id="timer-sub">25分集中 / 5分休憩</div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-start" id="btn-start">
+          <span class="btn-icon">▶</span>
+          <span class="btn-label">はじめる</span>
+        </button>
+        <button class="btn btn-pause" id="btn-pause">
+          <span class="btn-icon">⏸</span>
+          <span class="btn-label">一時停止</span>
+        </button>
+        <button class="btn btn-reset" id="btn-reset">
+          <span class="btn-icon">↺</span>
+          <span class="btn-label">リセット</span>
+        </button>
+      </div>
+
+      <div class="balloon">いっしょにがんばろう！</div>
+      <div class="card-stars">⭐ ⭐ ⭐</div>
+    </div>
+
+    <div class="progress-strip">
+      <span class="progress-label">今日の完了セット</span>
+      <span class="stars-track" id="stars-track">☆☆☆☆☆</span>
+      <span class="sets-badge" id="sets-badge">0/5セット</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var tomatoImg = document.getElementById('tomato-character');
+      var timerEl = document.getElementById('timer');
+      var modeBadgeEl = document.getElementById('mode-badge');
+      var timerSubEl = document.getElementById('timer-sub');
+      var startBtn   = document.getElementById('btn-start');
+      var pauseBtn   = document.getElementById('btn-pause');
+      var resetBtn   = document.getElementById('btn-reset');
+      var starsEl    = document.getElementById('stars-track');
+      var setsBadgeEl = document.getElementById('sets-badge');
+
+      if (!timerEl || !modeBadgeEl || !timerSubEl || !startBtn || !pauseBtn || !resetBtn) {
+        return;
+      }
+
+      if (tomatoImg) {
+        function showTomatoFallback() {
+          var span = document.createElement('span');
+          span.className = 'tomato-emoji-fallback';
+          span.textContent = '🍅';
+          if (tomatoImg.parentNode) {
+            tomatoImg.parentNode.replaceChild(span, tomatoImg);
+          }
+        }
+        tomatoImg.onerror = showTomatoFallback;
+        setTimeout(function () {
+          if (tomatoImg.complete && tomatoImg.naturalWidth === 0) {
+            showTomatoFallback();
+          }
+        }, 0);
+      }
+
+      // ── Web Audio API (Safari 互換: webkitAudioContext も対応) ──────
+      var audioCtx = null;
+
+      function getAudioCtx() {
+        if (!audioCtx) {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) { audioCtx = new AC(); }
+        }
+        return audioCtx;
+      }
+
+      // freq: Hz, durationSec: 秒, startDelaySec: 開始までの遅延秒, gainVal: 音量
+      function playBeep(freq, durationSec, startDelaySec, gainVal) {
+        var ctx = getAudioCtx();
+        if (!ctx) { return; }
+        var osc  = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        var t0 = ctx.currentTime + (startDelaySec || 0);
+        var t1 = t0 + durationSec;
+        gain.gain.setValueAtTime(gainVal, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t1);
+        osc.start(t0);
+        osc.stop(t1);
+      }
+
+      // 集中終了 → 休憩開始: やさしい2連ビープ「ピッ ピッ」
+      function playWorkEndSound() {
+        playBeep(740, 0.18, 0,    0.25);
+        playBeep(740, 0.18, 0.30, 0.25);
+      }
+
+      // 休憩終了 → 集中開始: やや低めの単音ビープ
+      function playBreakEndSound() {
+        playBeep(520, 0.22, 0, 0.25);
+      }
+      // ────────────────────────────────────────────────────────────────
+
+      // ※ テストするときはこの値を一時的に小さくする（例: WORK_SECONDS = 10, BREAK_SECONDS = 5）
+      var WORK_SECONDS  = 25 * 60;
+      var BREAK_SECONDS =  5 * 60;
+      var MAX_SETS = 5;
+      var mode = 'work';
+      var remaining = WORK_SECONDS;
+      var intervalId = null;
+      var running = false;
+      var completedSets = 0;
+
+      function updateProgressDisplay() {
+        var n = completedSets < MAX_SETS ? completedSets : MAX_SETS;
+        var stars = '';
+        var i;
+        for (i = 0; i < MAX_SETS; i++) {
+          stars += i < n ? '★' : '☆';
+        }
+        if (starsEl)    { starsEl.textContent    = stars; }
+        if (setsBadgeEl){ setsBadgeEl.textContent = n + '/' + MAX_SETS + 'セット'; }
+      }
+
+      function twoDigits(num) {
+        return num < 10 ? '0' + num : String(num);
+      }
+
+      function format(sec) {
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        return twoDigits(m) + ':' + twoDigits(s);
+      }
+
+      function setBreakClass(isBreak) {
+        if (document.body.classList) {
+          if (isBreak) {
+            document.body.classList.add('break-mode');
+          } else {
+            document.body.classList.remove('break-mode');
+          }
+          return;
+        }
+        if (isBreak && document.body.className.indexOf('break-mode') === -1) {
+          document.body.className += ' break-mode';
+        }
+        if (!isBreak) {
+          document.body.className = document.body.className.replace(/\bbreak-mode\b/g, '');
+        }
+      }
+
+      function applyMode() {
+        var isBreak = mode === 'break';
+        setBreakClass(isBreak);
+        modeBadgeEl.textContent = isBreak ? '休憩タイム' : '集中タイム';
+        timerSubEl.textContent  = isBreak ? '5分休憩中 / 次は25分集中' : '25分集中 / 5分休憩';
+        timerEl.textContent     = format(remaining);
+      }
+
+      function switchModeAndContinue() {
+        var wasWork = mode === 'work';
+        mode      = wasWork ? 'break' : 'work';
+        remaining = mode === 'work' ? WORK_SECONDS : BREAK_SECONDS;
+        // モード切り替え音（ボタン操作ではなく自動切り替え時のみ）
+        if (wasWork) {
+          completedSets++;
+          updateProgressDisplay();
+          playWorkEndSound();
+        } else {
+          playBreakEndSound();
+        }
+        applyMode();
+        running = false;
+        start();
+      }
+
+      function start() {
+        if (running || remaining <= 0) { return; }
+        // はじめる押下時に AudioContext を初期化・再開（autoplay 制限対策）
+        var ctx = getAudioCtx();
+        if (ctx && ctx.state === 'suspended') { ctx.resume(); }
+        running = true;
+        intervalId = setInterval(function () {
+          remaining--;
+          timerEl.textContent = format(remaining);
+          if (remaining <= 0) {
+            clearInterval(intervalId);
+            switchModeAndContinue();
+          }
+        }, 1000);
+      }
+
+      function pause() {
+        if (!running) { return; }
+        clearInterval(intervalId);
+        running = false;
+      }
+
+      function reset() {
+        clearInterval(intervalId);
+        running = false;
+        mode = 'work';
+        remaining = WORK_SECONDS;
+        completedSets = 0;
+        updateProgressDisplay();
+        applyMode();
+      }
+
+      applyMode();
+      startBtn.addEventListener('click', start);
+      pauseBtn.addEventListener('click', pause);
+      resetBtn.addEventListener('click', reset);
+    }());
+  </script>
+</body>
+</html>
