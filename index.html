@@ -124,6 +124,60 @@
       letter-spacing: .04em;
     }
 
+    /* ── Time settings ── */
+    .time-settings {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .time-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .time-label {
+      font-size: clamp(.7rem, 2.2vw, .82rem);
+      color: #bf6e3a;
+      font-weight: 700;
+      width: 2.2em;
+      text-align: right;
+    }
+    .time-adj-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      background: #ff8c42;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .08s ease, opacity .08s ease;
+      box-shadow: 0 2px 0 #b85a10;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .time-adj-btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .time-adj-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 #b85a10; }
+    .time-adj-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .time-val {
+      font-size: clamp(.9rem, 3vw, 1.1rem);
+      font-weight: 900;
+      color: #e85a3f;
+      min-width: 2ch;
+      text-align: center;
+    }
+    .time-unit {
+      font-size: clamp(.7rem, 2.2vw, .82rem);
+      color: #bf6e3a;
+      font-weight: 600;
+    }
+
     body.break-mode {
       background: linear-gradient(135deg, #eef8df 0%, #d8efc1 50%, #c4e6d1 100%);
     }
@@ -310,6 +364,22 @@
         <div class="timer-display" id="timer">25:00</div>
         <hr class="timer-divider">
         <div class="timer-sub" id="timer-sub">25分集中 / 5分休憩</div>
+        <div class="time-settings">
+          <div class="time-row">
+            <span class="time-label">集中</span>
+            <button class="time-adj-btn" id="work-minus">－</button>
+            <span class="time-val" id="work-val">25</span>
+            <span class="time-unit">分</span>
+            <button class="time-adj-btn" id="work-plus">＋</button>
+          </div>
+          <div class="time-row">
+            <span class="time-label">休憩</span>
+            <button class="time-adj-btn" id="break-minus">－</button>
+            <span class="time-val" id="break-val">5</span>
+            <span class="time-unit">分</span>
+            <button class="time-adj-btn" id="break-plus">＋</button>
+          </div>
+        </div>
       </div>
 
       <div class="buttons">
@@ -340,15 +410,21 @@
 
   <script>
     (function () {
-      var tomatoImg = document.getElementById('tomato-character');
-      var timerEl = document.getElementById('timer');
-      var modeBadgeEl = document.getElementById('mode-badge');
-      var timerSubEl = document.getElementById('timer-sub');
-      var startBtn   = document.getElementById('btn-start');
-      var pauseBtn   = document.getElementById('btn-pause');
-      var resetBtn   = document.getElementById('btn-reset');
-      var starsEl    = document.getElementById('stars-track');
-      var setsBadgeEl = document.getElementById('sets-badge');
+      var tomatoImg    = document.getElementById('tomato-character');
+      var timerEl      = document.getElementById('timer');
+      var modeBadgeEl  = document.getElementById('mode-badge');
+      var timerSubEl   = document.getElementById('timer-sub');
+      var startBtn     = document.getElementById('btn-start');
+      var pauseBtn     = document.getElementById('btn-pause');
+      var resetBtn     = document.getElementById('btn-reset');
+      var starsEl      = document.getElementById('stars-track');
+      var setsBadgeEl  = document.getElementById('sets-badge');
+      var workValEl    = document.getElementById('work-val');
+      var breakValEl   = document.getElementById('break-val');
+      var workMinusBtn  = document.getElementById('work-minus');
+      var workPlusBtn   = document.getElementById('work-plus');
+      var breakMinusBtn = document.getElementById('break-minus');
+      var breakPlusBtn  = document.getElementById('break-plus');
 
       if (!timerEl || !modeBadgeEl || !timerSubEl || !startBtn || !pauseBtn || !resetBtn) {
         return;
@@ -382,7 +458,14 @@
         return audioCtx;
       }
 
-      // freq: Hz, durationSec: 秒, startDelaySec: 開始までの遅延秒, gainVal: 音量
+      function prepareAudio() {
+        var ctx = getAudioCtx();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        return ctx;
+      }
+
       function playBeep(freq, durationSec, startDelaySec, gainVal) {
         var ctx = getAudioCtx();
         if (!ctx) { return; }
@@ -400,21 +483,21 @@
         osc.stop(t1);
       }
 
-      // 集中終了 → 休憩開始: やさしい2連ビープ「ピッ ピッ」
       function playWorkEndSound() {
         playBeep(740, 0.18, 0,    0.25);
         playBeep(740, 0.18, 0.30, 0.25);
       }
 
-      // 休憩終了 → 集中開始: やや低めの単音ビープ
       function playBreakEndSound() {
         playBeep(520, 0.22, 0, 0.25);
       }
       // ────────────────────────────────────────────────────────────────
 
-      // ※ テストするときはこの値を一時的に小さくする（例: WORK_SECONDS = 10, BREAK_SECONDS = 5）
-      var WORK_SECONDS  = 25 * 60;
-      var BREAK_SECONDS =  5 * 60;
+      // ※ テストするときはこの値を一時的に小さくする（例: WORK_SECONDS = 5, BREAK_SECONDS = 3）
+      var WORK_SECONDS = 25 * 60;
+      var BREAK_SECONDS = 5 * 60;
+      var workMinutes  = WORK_SECONDS / 60;
+      var breakMinutes = BREAK_SECONDS / 60;
       var MAX_SETS = 5;
       var mode = 'work';
       var remaining = WORK_SECONDS;
@@ -429,8 +512,8 @@
         for (i = 0; i < MAX_SETS; i++) {
           stars += i < n ? '★' : '☆';
         }
-        if (starsEl)    { starsEl.textContent    = stars; }
-        if (setsBadgeEl){ setsBadgeEl.textContent = n + '/' + MAX_SETS + 'セット'; }
+        if (starsEl)     { starsEl.textContent     = stars; }
+        if (setsBadgeEl) { setsBadgeEl.textContent = n + '/' + MAX_SETS + 'セット'; }
       }
 
       function twoDigits(num) {
@@ -441,6 +524,13 @@
         var m = Math.floor(sec / 60);
         var s = sec % 60;
         return twoDigits(m) + ':' + twoDigits(s);
+      }
+
+      function durationText(seconds, minutes) {
+        if (seconds % 60 === 0) {
+          return minutes + '分';
+        }
+        return seconds + '秒';
       }
 
       function setBreakClass(isBreak) {
@@ -460,19 +550,58 @@
         }
       }
 
+      function timerSubText() {
+        var isBreak = mode === 'break';
+        return isBreak
+          ? durationText(BREAK_SECONDS, breakMinutes) + '休憩中 / 次は' + durationText(WORK_SECONDS, workMinutes) + '集中'
+          : durationText(WORK_SECONDS, workMinutes) + '集中 / ' + durationText(BREAK_SECONDS, breakMinutes) + '休憩';
+      }
+
       function applyMode() {
         var isBreak = mode === 'break';
         setBreakClass(isBreak);
         modeBadgeEl.textContent = isBreak ? '休憩タイム' : '集中タイム';
-        timerSubEl.textContent  = isBreak ? '5分休憩中 / 次は25分集中' : '25分集中 / 5分休憩';
+        timerSubEl.textContent  = timerSubText();
         timerEl.textContent     = format(remaining);
+      }
+
+      function setAdjBtnsDisabled(disabled) {
+        var btns = [workMinusBtn, workPlusBtn, breakMinusBtn, breakPlusBtn];
+        for (var i = 0; i < btns.length; i++) {
+          if (btns[i]) { btns[i].disabled = disabled; }
+        }
+      }
+
+      function adjustTime(type, delta) {
+        if (running) { return; }
+        if (type === 'work') {
+          workMinutes += delta;
+          if (workMinutes < 1)  { workMinutes = 1; }
+          if (workMinutes > 60) { workMinutes = 60; }
+          WORK_SECONDS = workMinutes * 60;
+          if (workValEl) { workValEl.textContent = String(workMinutes); }
+          if (mode === 'work') {
+            remaining = WORK_SECONDS;
+            timerEl.textContent = format(remaining);
+          }
+        } else {
+          breakMinutes += delta;
+          if (breakMinutes < 1)  { breakMinutes = 1; }
+          if (breakMinutes > 30) { breakMinutes = 30; }
+          BREAK_SECONDS = breakMinutes * 60;
+          if (breakValEl) { breakValEl.textContent = String(breakMinutes); }
+          if (mode === 'break') {
+            remaining = BREAK_SECONDS;
+            timerEl.textContent = format(remaining);
+          }
+        }
+        timerSubEl.textContent = timerSubText();
       }
 
       function switchModeAndContinue() {
         var wasWork = mode === 'work';
         mode      = wasWork ? 'break' : 'work';
         remaining = mode === 'work' ? WORK_SECONDS : BREAK_SECONDS;
-        // モード切り替え音（ボタン操作ではなく自動切り替え時のみ）
         if (wasWork) {
           completedSets++;
           updateProgressDisplay();
@@ -487,10 +616,9 @@
 
       function start() {
         if (running || remaining <= 0) { return; }
-        // はじめる押下時に AudioContext を初期化・再開（autoplay 制限対策）
-        var ctx = getAudioCtx();
-        if (ctx && ctx.state === 'suspended') { ctx.resume(); }
+        prepareAudio();
         running = true;
+        setAdjBtnsDisabled(true);
         intervalId = setInterval(function () {
           remaining--;
           timerEl.textContent = format(remaining);
@@ -505,6 +633,7 @@
         if (!running) { return; }
         clearInterval(intervalId);
         running = false;
+        setAdjBtnsDisabled(false);
       }
 
       function reset() {
@@ -514,6 +643,7 @@
         remaining = WORK_SECONDS;
         completedSets = 0;
         updateProgressDisplay();
+        setAdjBtnsDisabled(false);
         applyMode();
       }
 
@@ -521,6 +651,11 @@
       startBtn.addEventListener('click', start);
       pauseBtn.addEventListener('click', pause);
       resetBtn.addEventListener('click', reset);
+
+      if (workMinusBtn)  { workMinusBtn.addEventListener('click',  function () { adjustTime('work',  -1); }); }
+      if (workPlusBtn)   { workPlusBtn.addEventListener('click',   function () { adjustTime('work',  +1); }); }
+      if (breakMinusBtn) { breakMinusBtn.addEventListener('click', function () { adjustTime('break', -1); }); }
+      if (breakPlusBtn)  { breakPlusBtn.addEventListener('click',  function () { adjustTime('break', +1); }); }
     }());
   </script>
 </body>
